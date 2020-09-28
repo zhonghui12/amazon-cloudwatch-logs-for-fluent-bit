@@ -189,47 +189,53 @@ func newCloudWatchLogsClient(config OutputPluginConfig) (*cloudwatchlogs.CloudWa
 		return endpoints.DefaultResolver().EndpointFor(service, region, optFns...)
 	}
 
-	svcConfig := &aws.Config{
+	baseConfig := &aws.Config{
 		Region:                        aws.String(config.Region),
 		EndpointResolver:              endpoints.ResolverFunc(customResolverFn),
 		CredentialsChainVerboseErrors: aws.Bool(true),
 	}
 
 	if config.CredsEndpoint != "" {
-		creds := endpointcreds.NewCredentialsClient(*svcConfig, request.Handlers{}, config.CredsEndpoint,
+		creds := endpointcreds.NewCredentialsClient(*baseConfig, request.Handlers{}, config.CredsEndpoint,
 			func(provider *endpointcreds.Provider) {
 				provider.ExpiryWindow = 5 * time.Minute
 			})
-		svcConfig.Credentials = creds
+		baseConfig.Credentials = creds
 	}
 
-	sess, err := session.NewSession(svcConfig)
+	sess, err := session.NewSession(baseConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	var finalSess *session.Session = sess
-	eksConfig := &aws.Config{}
-	stsConfig := &aws.Config{}
-	finalConfig := &aws.Config{}
+	var svcSess = sess
+	var svcConfig *aws.Config
 	eksRole := os.Getenv("EKS_POD_EXECUTION_ROLE")
 	if eksRole != "" {
-		creds := stscreds.NewCredentials(finalSess, eksRole)
+		eksConfig := &aws.Config{}
+		creds := stscreds.NewCredentials(svcSess, eksRole)
 		eksConfig.Credentials = creds
-		finalConfig = eksConfig
-	}
+		svcConfig = eksConfig
 
-	if config.RoleARN != "" {
-		finalSess, err = session.NewSession(finalConfig)
+		svcSess, err := session.NewSession(baseConfig)
 		if err != nil {
 			return nil, err
 		}
-		creds := stscreds.NewCredentials(finalSess, config.RoleARN)
-		stsConfig.Credentials = creds
-		finalConfig = stsConfig
 	}
 
-	client := cloudwatchlogs.New(finalSess, finalConfig)
+	if config.RoleARN != "" {
+		stsConfig := &aws.Config{}
+		creds := stscreds.NewCredentials(svcSess, config.RoleARN)
+		stsConfig.Credentials = creds
+		svcConfig = stsConfig
+
+		svcSess, err = session.NewSession(svcConfig)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	client := cloudwatchlogs.New(svcSess)
 	client.Handlers.Build.PushBackNamed(plugins.CustomUserAgentHandler())
 	if config.LogFormat != "" {
 		client.Handlers.Build.PushBackNamed(LogFormatHandler(config.LogFormat))
