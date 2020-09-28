@@ -217,7 +217,7 @@ func newCloudWatchLogsClient(config OutputPluginConfig) (*cloudwatchlogs.CloudWa
 		eksConfig.Credentials = creds
 		svcConfig = eksConfig
 
-		svcSess, err := session.NewSession(baseConfig)
+		svcSess, err = session.NewSession(baseConfig)
 		if err != nil {
 			return nil, err
 		}
