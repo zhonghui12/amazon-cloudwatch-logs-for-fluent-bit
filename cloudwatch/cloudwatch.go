@@ -208,13 +208,13 @@ func newCloudWatchLogsClient(config OutputPluginConfig) (*cloudwatchlogs.CloudWa
 		return nil, err
 	}
 
-	var finalSess *session.Session
+	var finalSess *session.Session = sess
 	eksConfig := &aws.Config{}
 	stsConfig := &aws.Config{}
 	finalConfig := &aws.Config{}
 	eksRole := os.Getenv("EKS_POD_EXECUTION_ROLE")
 	if eksRole != "" {
-		creds := stscreds.NewCredentials(sess, eksRole)
+		creds := stscreds.NewCredentials(finalSess, eksRole)
 		eksConfig.Credentials = creds
 		finalConfig = eksConfig
 	}
