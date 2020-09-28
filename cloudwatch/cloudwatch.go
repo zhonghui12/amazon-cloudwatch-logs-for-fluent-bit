@@ -15,6 +15,7 @@ package cloudwatch
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -207,13 +208,27 @@ func newCloudWatchLogsClient(config OutputPluginConfig) (*cloudwatchlogs.CloudWa
 		return nil, err
 	}
 
+	eksConfig := &aws.Config{}
 	stsConfig := &aws.Config{}
+	finalConfig := &aws.Config{}
+	eksRole := os.Getenv("EKS_POD_EXECUTION_ROLE")
+	if eksRole != "" {
+		sess2, err := session.NewSession(stsConfig)
+		if err != nil {
+			return nil, err
+		}
+		creds := stscreds.NewCredentials(sess2, eksRole)
+		eksConfig.Credentials = creds
+		finalConfig = eksConfig
+	}
+
 	if config.RoleARN != "" {
 		creds := stscreds.NewCredentials(sess, config.RoleARN)
 		stsConfig.Credentials = creds
+		finalConfig = stsConfig
 	}
 
-	client := cloudwatchlogs.New(sess, stsConfig)
+	client := cloudwatchlogs.New(sess, finalConfig)
 	client.Handlers.Build.PushBackNamed(plugins.CustomUserAgentHandler())
 	if config.LogFormat != "" {
 		client.Handlers.Build.PushBackNamed(LogFormatHandler(config.LogFormat))
