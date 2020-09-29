@@ -208,16 +208,33 @@ func newCloudWatchLogsClient(config OutputPluginConfig) (*cloudwatchlogs.CloudWa
 		return nil, err
 	}
 
+	// var client *cloudwatchlogs.CloudWatchLogs
+	//
+	// eksRole := os.Getenv("EKS_POD_EXECUTION_ROLE")
+	//
+	// if eksRole != "" || config.RoleARN != "" {
+	// 	// construct chain of assume role providers
+	// 	providers := make([]credentials.Provider)
+	// 	if eksRole != "" {
+	// 		p := &AssumeRoleProvider{
+	// 			Client:   sts.New(c),
+	// 			RoleARN:  roleARN,
+	// 			Duration: DefaultDuration,
+	// 		}
+	// 	}
+	// }
+
 	var svcSess = sess
-	var svcConfig *aws.Config
+	var svcConfig = baseConfig
 	eksRole := os.Getenv("EKS_POD_EXECUTION_ROLE")
 	if eksRole != "" {
+		logrus.Info("Adding EKS POD creds")
 		eksConfig := &aws.Config{}
 		creds := stscreds.NewCredentials(svcSess, eksRole)
 		eksConfig.Credentials = creds
 		svcConfig = eksConfig
 
-		svcSess, err = session.NewSession(baseConfig)
+		svcSess, err = session.NewSession(svcConfig)
 		if err != nil {
 			return nil, err
 		}
@@ -235,7 +252,7 @@ func newCloudWatchLogsClient(config OutputPluginConfig) (*cloudwatchlogs.CloudWa
 		}
 	}
 
-	client := cloudwatchlogs.New(svcSess)
+	client := cloudwatchlogs.New(svcSess, svcConfig)
 	client.Handlers.Build.PushBackNamed(plugins.CustomUserAgentHandler())
 	if config.LogFormat != "" {
 		client.Handlers.Build.PushBackNamed(LogFormatHandler(config.LogFormat))
