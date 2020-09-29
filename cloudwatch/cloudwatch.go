@@ -232,6 +232,7 @@ func newCloudWatchLogsClient(config OutputPluginConfig) (*cloudwatchlogs.CloudWa
 		eksConfig := &aws.Config{}
 		creds := stscreds.NewCredentials(svcSess, eksRole)
 		eksConfig.Credentials = creds
+		eksConfig.Region = aws.String(config.Region)
 		svcConfig = eksConfig
 
 		svcSess, err = session.NewSession(svcConfig)
@@ -244,6 +245,7 @@ func newCloudWatchLogsClient(config OutputPluginConfig) (*cloudwatchlogs.CloudWa
 		stsConfig := &aws.Config{}
 		creds := stscreds.NewCredentials(svcSess, config.RoleARN)
 		stsConfig.Credentials = creds
+		stsConfig.Region = aws.String(config.Region)
 		svcConfig = stsConfig
 
 		svcSess, err = session.NewSession(svcConfig)
